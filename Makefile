@@ -35,7 +35,7 @@ install: all
 	depmod $(kernelver)
 
 clean:
-	rm -rf */.*.o.d */*.o */*.ko */*.mod.c */.*.cmd .tmp_versions Module* modules*
+	rm -rf */.*.o.d */*.o */*.ko */*.mod.c */*.mod */.*.cmd .tmp_versions Module* modules*
 	$(MAKE) -C apps clean
 
 
