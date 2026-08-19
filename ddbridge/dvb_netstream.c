@@ -186,10 +186,10 @@ static int do_ioctl(struct file *file, unsigned int cmd, void *parg)
 	}
 
 	case NS_SET_PIDS:
-		ret = copy_from_user(nss->pids,
-				     (void __user *) *(u8 **) parg, 0x400);
-		if (ret < 0)
-			return ret;
+		if (copy_from_user(nss->pids,
+				   (void __user *) *(u8 **) parg,
+				   sizeof(nss->pids)))
+			return -EFAULT;
 		if (ns->set_pids)
 			ret = ns->set_pids(nss);
 		break;
