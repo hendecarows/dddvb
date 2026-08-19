@@ -3004,6 +3004,7 @@ static int nsd_do_ioctl(struct file *file, unsigned int cmd, void *parg)
 	{
 		struct dvb_nsd_ts *ts = parg;
 		u32 ctrl = ddbreadl(dev, TS_CAPTURE_CONTROL);
+		u32 len;
 
 		if (ctrl & 1)
 			return -EBUSY;
@@ -3011,8 +3012,11 @@ static int nsd_do_ioctl(struct file *file, unsigned int cmd, void *parg)
 			return -EAGAIN;
 		ddbcpyfrom(dev, dev->tsbuf, TS_CAPTURE_MEMORY,
 			   TS_CAPTURE_LEN);
-		ts->len = ddbreadl(dev, TS_CAPTURE_RECEIVED) & 0x1fff;
-		if (copy_to_user((void __user *) ts->ts, dev->tsbuf, ts->len))
+		len = ddbreadl(dev, TS_CAPTURE_RECEIVED) & 0x1fff;
+		if (len > TS_CAPTURE_LEN)
+			len = TS_CAPTURE_LEN;
+		ts->len = len;
+		if (copy_to_user((void __user *) ts->ts, dev->tsbuf, len))
 			return -EIO;
 		break;
 	}
