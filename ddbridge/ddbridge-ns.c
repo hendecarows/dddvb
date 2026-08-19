@@ -250,6 +250,7 @@ static int ns_set_rtcp_msg(struct dvbnss *nss, u8 *msg, u32 len)
 	struct ddb_ns *dns = (struct ddb_ns *)nss->priv;
 	u32 off = STREAM_PACKET_ADR(dns->nr);
 	u32 coff = 96;
+	u32 plen;
 	u16 wlen;
 
 	if (!len) {
@@ -258,6 +259,13 @@ static int ns_set_rtcp_msg(struct dvbnss *nss, u8 *msg, u32 len)
 			  STREAM_CONTROL(dns->nr));
 		return 0;
 	}
+	/* the message is zero padded to a multiple of 4 bytes below */
+	if (len > sizeof(dns->p))
+		return -EINVAL;
+	plen = (len + 3) & ~3u;
+	if (dns->rtcp_len > sizeof(dns->p) - coff ||
+	    plen > sizeof(dns->p) - coff - dns->rtcp_len)
+		return -EINVAL;
 	if (copy_from_user(dns->p + coff + dns->rtcp_len,
 			   (void __user *) msg, len))
 		return -EFAULT;
@@ -379,6 +387,9 @@ static int ns_set_ts_packets(struct dvbnss *nss, u8 *buf, u32 len)
 	u32 off = STREAM_PACKET_ADR(dns->nr);
 
 	if (nss->params.flags & DVB_NS_RTCP)
+		return -EINVAL;
+	if (dns->ts_offset > sizeof(dns->p) ||
+	    len > sizeof(dns->p) - dns->ts_offset)
 		return -EINVAL;
 
 	if (copy_from_user(dns->p + dns->ts_offset,
