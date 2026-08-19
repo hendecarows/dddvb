@@ -3400,7 +3400,7 @@ static long ddb_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			return -EFAULT;
 		if (i2c.bus >= dev->i2c_num)
 			return -EINVAL;
-		if (i2c.mlen + i2c.hlen > 512)
+		if (i2c.hlen > 512 || i2c.mlen > 512 - i2c.hlen)
 			return -EINVAL;
 
 		adap = &dev->i2c[i2c.bus].adap;
@@ -3424,7 +3424,7 @@ static long ddb_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			return -EFAULT;
 		if (i2c.bus >= dev->i2c_num)
 			return -EINVAL;
-		if (i2c.mlen + i2c.hlen > 250)
+		if (i2c.hlen > 250 || i2c.mlen > 250 - i2c.hlen)
 			return -EINVAL;
 
 		adap = &dev->i2c[i2c.bus].adap;
