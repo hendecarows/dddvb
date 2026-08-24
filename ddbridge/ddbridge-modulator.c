@@ -1218,12 +1218,6 @@ static int mod_set_iq(struct ddb *dev, u32 steps, u32 chan, u32 freq)
 	return 0;
 }
 
-u32 eqtab[] = {
-	0x0000FFDB, 0x00000121, 0x0000FF0A, 0x000003D7,
-	0x000001C4, 0x000005A5, 0x000009CC, 0x0000F50D,
-	0x00001B23, 0x0000EEB7, 0x00006A28
-};
-
 static void mod_set_channelsumshift(struct ddb *dev, u32 shift)
 {
 	ddbwritel(dev, (shift & 3) << 2, MODULATOR_CONTROL);
