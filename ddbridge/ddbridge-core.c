@@ -3605,7 +3605,13 @@ static ssize_t temp_show(struct device *device,
 		temp = 0xffff & ddblreadl(link, TEMPMON_SENSOR0);
 		temp = (temp * 1000) >> 8;
 
-		return sprintf(buf, "%d\n", temp);
+		temp2 = 0xffff & ddblreadl(link, TEMPMON_SENSOR1);
+		temp2 = (temp2 * 1000) >> 8;
+
+		temp3 = 0xffff & ddblreadl(link, TEMPMON_SENSOR2);
+		temp3 = (temp2 * 1000) >> 8;
+
+		return sprintf(buf, "%d %d %d\n", temp, temp2, temp3);
 	}
 	if (!link->info->temp_num)
 		return sprintf(buf, "no sensor\n");
