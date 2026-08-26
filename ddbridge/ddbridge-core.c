@@ -4130,7 +4130,7 @@ static void ddb_device_attrs_del(struct ddb *dev)
 		if (dev->link[i].info &&
 		    dev->link[i].info->temp_num)
 			device_remove_file(dev->ddb_dev, &ddb_attrs_temp[i]);
-	for (i = 0; i < dev->link[0].info->port_num; i++)
+	for (i = 0; (i < dev->link[0].info->port_num) && (i < 10); i++)
 		device_remove_file(dev->ddb_dev, &ddb_attrs_mod[i]);
 	for (i = 0; i < dev->link[0].info->fan_num; i++)
 		device_remove_file(dev->ddb_dev, &ddb_attrs_fan[i]);
