@@ -42,10 +42,11 @@
 
 void dvb_ringbuffer_init(struct dvb_ringbuffer *rbuf, void *data, size_t len)
 {
-	rbuf->pread=rbuf->pwrite=0;
-	rbuf->data=data;
-	rbuf->size=len;
-	rbuf->error=0;
+	rbuf->pread = 0;
+	rbuf->pwrite = 0;
+	rbuf->data = data;
+	rbuf->size = len;
+	rbuf->error = 0;
 
 	init_waitqueue_head(&rbuf->queue);
 
@@ -56,9 +57,6 @@ void dvb_ringbuffer_init(struct dvb_ringbuffer *rbuf, void *data, size_t len)
 
 int dvb_ringbuffer_empty(struct dvb_ringbuffer *rbuf)
 {
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0))
-	return (rbuf->pread == rbuf->pwrite);
-#else
 	/* smp_load_acquire() to load write pointer on reader side
 	 * this pairs with smp_store_release() in dvb_ringbuffer_write(),
 	 * dvb_ringbuffer_write_user(), or dvb_ringbuffer_reset()
@@ -66,7 +64,6 @@ int dvb_ringbuffer_empty(struct dvb_ringbuffer *rbuf)
 	 * for memory barriers also see Documentation/core-api/circular-buffers.rst
 	 */
 	return (rbuf->pread == smp_load_acquire(&rbuf->pwrite));
-#endif
 }
 
 
@@ -80,11 +77,7 @@ ssize_t dvb_ringbuffer_free(struct dvb_ringbuffer *rbuf)
 	 * dvb_ringbuffer_read_user(), dvb_ringbuffer_flush(),
 	 * or dvb_ringbuffer_reset()
 	 */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0))
 	free = READ_ONCE(rbuf->pread) - rbuf->pwrite;
-#else
-	free = ACCESS_ONCE(rbuf->pread) - rbuf->pwrite;
-#endif
 	if (free <= 0)
 		free += rbuf->size;
 	return free-1;
@@ -96,15 +89,11 @@ ssize_t dvb_ringbuffer_avail(struct dvb_ringbuffer *rbuf)
 {
 	ssize_t avail;
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0))
-	avail = rbuf->pwrite - rbuf->pread;
-#else
 	/* smp_load_acquire() to load write pointer on reader side
 	 * this pairs with smp_store_release() in dvb_ringbuffer_write(),
 	 * dvb_ringbuffer_write_user(), or dvb_ringbuffer_reset()
 	 */
 	avail = smp_load_acquire(&rbuf->pwrite) - rbuf->pread;
-#endif
 	if (avail < 0)
 		avail += rbuf->size;
 	return avail;
@@ -114,9 +103,6 @@ ssize_t dvb_ringbuffer_avail(struct dvb_ringbuffer *rbuf)
 
 void dvb_ringbuffer_flush(struct dvb_ringbuffer *rbuf)
 {
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0))
-	rbuf->pread = rbuf->pwrite;
-#else
 	/* dvb_ringbuffer_flush() counts as read operation
 	 * smp_load_acquire() to load write pointer
 	 * smp_store_release() to update read pointer, this ensures that the
@@ -124,23 +110,18 @@ void dvb_ringbuffer_flush(struct dvb_ringbuffer *rbuf)
 	 * calls on other cpu cores
 	 */
 	smp_store_release(&rbuf->pread, smp_load_acquire(&rbuf->pwrite));
-#endif
 	rbuf->error = 0;
 }
 EXPORT_SYMBOL(dvb_ringbuffer_flush);
 
 void dvb_ringbuffer_reset(struct dvb_ringbuffer *rbuf)
 {
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0))
-	rbuf->pread = rbuf->pwrite = 0;
-#else
 	/* dvb_ringbuffer_reset() counts as read and write operation
 	 * smp_store_release() to update read pointer
 	 */
 	smp_store_release(&rbuf->pread, 0);
 	/* smp_store_release() to update write pointer */
 	smp_store_release(&rbuf->pwrite, 0);
-#endif
 	rbuf->error = 0;
 }
 
@@ -166,25 +147,17 @@ ssize_t dvb_ringbuffer_read_user(struct dvb_ringbuffer *rbuf, u8 __user *buf, si
 			return -EFAULT;
 		buf += split;
 		todo -= split;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0))
-		rbuf->pread = 0;
-#else
 		/* smp_store_release() for read pointer update to ensure
 		 * that buf is not overwritten until read is complete,
 		 * this pairs with READ_ONCE() in dvb_ringbuffer_free()
 		 */
 		smp_store_release(&rbuf->pread, 0);
-#endif
 	}
 	if (copy_to_user(buf, rbuf->data+rbuf->pread, todo))
 		return -EFAULT;
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0))
-	rbuf->pread = (rbuf->pread + todo) % rbuf->size;
-#else
 	/* smp_store_release() to update read pointer, see above */
 	smp_store_release(&rbuf->pread, (rbuf->pread + todo) % rbuf->size);
-#endif
 	return len;
 }
 
@@ -198,24 +171,16 @@ void dvb_ringbuffer_read(struct dvb_ringbuffer *rbuf, u8 *buf, size_t len)
 		memcpy(buf, rbuf->data+rbuf->pread, split);
 		buf += split;
 		todo -= split;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0))
-		rbuf->pread = 0;
-#else
 		/* smp_store_release() for read pointer update to ensure
 		 * that buf is not overwritten until read is complete,
 		 * this pairs with READ_ONCE() in dvb_ringbuffer_free()
 		 */
 		smp_store_release(&rbuf->pread, 0);
-#endif
 	}
 	memcpy(buf, rbuf->data+rbuf->pread, todo);
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0))
-	rbuf->pread = (rbuf->pread + todo) % rbuf->size;
-#else
 	/* smp_store_release() to update read pointer, see above */
 	smp_store_release(&rbuf->pread, (rbuf->pread + todo) % rbuf->size);
-#endif
 }
 
 
@@ -230,24 +195,16 @@ ssize_t dvb_ringbuffer_write(struct dvb_ringbuffer *rbuf, const u8 *buf, size_t 
 		memcpy(rbuf->data+rbuf->pwrite, buf, split);
 		buf += split;
 		todo -= split;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0))
-		rbuf->pwrite = 0;
-#else
 		/* smp_store_release() for write pointer update to ensure that
 		 * written data is visible on other cpu cores before the pointer
 		 * update, this pairs with smp_load_acquire() in
 		 * dvb_ringbuffer_empty() or dvb_ringbuffer_avail()
 		 */
 		smp_store_release(&rbuf->pwrite, 0);
-#endif
 	}
 	memcpy(rbuf->data+rbuf->pwrite, buf, todo);
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0))
-	rbuf->pwrite = (rbuf->pwrite + todo) % rbuf->size;
-#else
 	/* smp_store_release() for write pointer update, see above */
 	smp_store_release(&rbuf->pwrite, (rbuf->pwrite + todo) % rbuf->size);
-#endif
 
 	return len;
 }
@@ -267,31 +224,23 @@ ssize_t dvb_ringbuffer_write_user(struct dvb_ringbuffer *rbuf,
 			return len - todo;
 		buf += split;
 		todo -= split;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0))
-		rbuf->pwrite = 0;
-#else
 		/* smp_store_release() for write pointer update to ensure that
 		 * written data is visible on other cpu cores before the pointer
 		 * update, this pairs with smp_load_acquire() in
 		 * dvb_ringbuffer_empty() or dvb_ringbuffer_avail()
 		 */
 		smp_store_release(&rbuf->pwrite, 0);
-#endif
 	}
 	status = copy_from_user(rbuf->data+rbuf->pwrite, buf, todo);
 	if (status)
 		return len - todo;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0))
-	rbuf->pwrite = (rbuf->pwrite + todo) % rbuf->size;
-#else
 	/* smp_store_release() for write pointer update, see above */
 	smp_store_release(&rbuf->pwrite, (rbuf->pwrite + todo) % rbuf->size);
-#endif
 
 	return len;
 }
 
-ssize_t dvb_ringbuffer_pkt_write(struct dvb_ringbuffer *rbuf, u8* buf, size_t len)
+ssize_t dvb_ringbuffer_pkt_write(struct dvb_ringbuffer *rbuf, u8 *buf, size_t len)
 {
 	int status;
 	ssize_t oldpwrite = rbuf->pwrite;
@@ -301,7 +250,8 @@ ssize_t dvb_ringbuffer_pkt_write(struct dvb_ringbuffer *rbuf, u8* buf, size_t le
 	DVB_RINGBUFFER_WRITE_BYTE(rbuf, PKT_READY);
 	status = dvb_ringbuffer_write(rbuf, buf, len);
 
-	if (status < 0) rbuf->pwrite = oldpwrite;
+	if (status < 0)
+		rbuf->pwrite = oldpwrite;
 	return status;
 }
 
@@ -314,8 +264,10 @@ ssize_t dvb_ringbuffer_pkt_read_user(struct dvb_ringbuffer *rbuf, size_t idx,
 
 	pktlen = rbuf->data[idx] << 8;
 	pktlen |= rbuf->data[(idx + 1) % rbuf->size];
-	if (offset > pktlen) return -EINVAL;
-	if ((offset + len) > pktlen) len = pktlen - offset;
+	if (offset > pktlen)
+		return -EINVAL;
+	if ((offset + len) > pktlen)
+		len = pktlen - offset;
 
 	idx = (idx + DVB_RINGBUFFER_PKTHDRSIZE + offset) % rbuf->size;
 	todo = len;
@@ -334,7 +286,7 @@ ssize_t dvb_ringbuffer_pkt_read_user(struct dvb_ringbuffer *rbuf, size_t idx,
 }
 
 ssize_t dvb_ringbuffer_pkt_read(struct dvb_ringbuffer *rbuf, size_t idx,
-				int offset, u8* buf, size_t len)
+				int offset, u8 *buf, size_t len)
 {
 	size_t todo;
 	size_t split;
@@ -342,8 +294,10 @@ ssize_t dvb_ringbuffer_pkt_read(struct dvb_ringbuffer *rbuf, size_t idx,
 
 	pktlen = rbuf->data[idx] << 8;
 	pktlen |= rbuf->data[(idx + 1) % rbuf->size];
-	if (offset > pktlen) return -EINVAL;
-	if ((offset + len) > pktlen) len = pktlen - offset;
+	if (offset > pktlen)
+		return -EINVAL;
+	if ((offset + len) > pktlen)
+		len = pktlen - offset;
 
 	idx = (idx + DVB_RINGBUFFER_PKTHDRSIZE + offset) % rbuf->size;
 	todo = len;
@@ -365,7 +319,7 @@ void dvb_ringbuffer_pkt_dispose(struct dvb_ringbuffer *rbuf, size_t idx)
 	rbuf->data[(idx + 2) % rbuf->size] = PKT_DISPOSED;
 
 	// clean up disposed packets
-	while(dvb_ringbuffer_avail(rbuf) > DVB_RINGBUFFER_PKTHDRSIZE) {
+	while (dvb_ringbuffer_avail(rbuf) > DVB_RINGBUFFER_PKTHDRSIZE) {
 		if (DVB_RINGBUFFER_PEEK(rbuf, 2) == PKT_DISPOSED) {
 			pktlen = DVB_RINGBUFFER_PEEK(rbuf, 0) << 8;
 			pktlen |= DVB_RINGBUFFER_PEEK(rbuf, 1);
@@ -377,14 +331,14 @@ void dvb_ringbuffer_pkt_dispose(struct dvb_ringbuffer *rbuf, size_t idx)
 	}
 }
 
-ssize_t dvb_ringbuffer_pkt_next(struct dvb_ringbuffer *rbuf, size_t idx, size_t* pktlen)
+ssize_t dvb_ringbuffer_pkt_next(struct dvb_ringbuffer *rbuf, size_t idx, size_t *pktlen)
 {
 	int consumed;
 	int curpktlen;
 	int curpktstatus;
 
 	if (idx == -1) {
-	       idx = rbuf->pread;
+		idx = rbuf->pread;
 	} else {
 		curpktlen = rbuf->data[idx] << 8;
 		curpktlen |= rbuf->data[(idx + 1) % rbuf->size];
@@ -395,7 +349,7 @@ ssize_t dvb_ringbuffer_pkt_next(struct dvb_ringbuffer *rbuf, size_t idx, size_t*
 	if (consumed < 0)
 		consumed += rbuf->size;
 
-	while((dvb_ringbuffer_avail(rbuf) - consumed) > DVB_RINGBUFFER_PKTHDRSIZE) {
+	while ((dvb_ringbuffer_avail(rbuf) - consumed) > DVB_RINGBUFFER_PKTHDRSIZE) {
 
 		curpktlen = rbuf->data[idx] << 8;
 		curpktlen |= rbuf->data[(idx + 1) % rbuf->size];
