@@ -489,8 +489,10 @@ static struct mci_base *match_base(void *key)
 	return NULL;
 }
 
+/* entry 2 should be DVB-S2X but it does not exist in API */
+
 static enum fe_delivery_system todelsys[16] = {
-	SYS_DVBS, SYS_DVBS2, SYS_DVBS2, SYS_DVBC_ANNEX_A,
+	SYS_DVBS, SYS_DVBS2, SYS_UNDEFINED, SYS_DVBC_ANNEX_A,
 	SYS_DVBT, SYS_DVBT2, SYS_DVBC2, SYS_DVBC_ANNEX_B,
 	SYS_ISDBT, SYS_ISDBC, SYS_ISDBS, SYS_ISDBS3,
 	SYS_ATSC, SYS_ATSC3, SYS_UNDEFINED, SYS_UNDEFINED
@@ -508,12 +510,12 @@ static void adjust_caps(struct mci *mci)
 	if (mci->signal_info.status & 0x80)
 		return;
 	dels = mci->result.mx_capabilities.standards;
-	printk("CAPS = %02x\n", dels);
-	for (i = j = 0; i < 16; i++) {
+	for (i = j = 0; j < MAX_DELSYS && i < 16; i++) {
 		if (dels & (1 << i))
-			mci->fe.ops.delsys[j++] = todelsys[i];
+			if (todelsys[i] != SYS_UNDEFINED)
+				mci->fe.ops.delsys[j++] = todelsys[i];
 	}
-	if (j < 16)
+	if (j < MAX_DELSYS)
 		mci->fe.ops.delsys[j] = 0;
 }
 
