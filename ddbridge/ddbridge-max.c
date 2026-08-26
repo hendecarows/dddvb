@@ -580,6 +580,7 @@ int ddb_fe_attach_mci(struct ddb_input *input, u32 type)
 		
                 // delmode: 0 - sat,sat  1-cable,cable/sat 2-cable,cable
 		switch (delmode & 3) {
+		default:
 		case 0:
 			mode = 2;
 			mmode = 2;  /* M_S */
