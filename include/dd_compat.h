@@ -41,6 +41,9 @@
 
 #define SYS_ATSC3 (SYS_DVBC2+1)
 #define SYS_ISDBS3 (SYS_ATSC3+1)
+
+#define FEC_29_45 (FEC_7_15+1)
+#define FEC_31_45 (FEC_29_45+1)
 #endif
 
 #if 0
