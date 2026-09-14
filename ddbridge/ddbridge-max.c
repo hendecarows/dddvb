@@ -225,7 +225,7 @@ static int max_set_input_unlocked(struct dvb_frontend *fe, int in)
 
 	if (in > 3)
 		return -EINVAL;
-	lnb_set_tone(dev, port->lnr, input->nr, 0);
+	//lnb_set_tone(dev, port->lnr, input->nr, SEC_TONE_OFF);
 
 	if (dvb->input != in) {
 		u32 bit = (1ULL << input->nr);
